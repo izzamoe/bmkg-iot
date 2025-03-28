@@ -235,7 +235,12 @@ func (hc *HTTPClient) DownloadFileWithProgress(url string, destPath string, prog
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			fmt.Printf("Error closing file: %v\n", err)
+		}
+	}(file)
 
 	contentLength := resp.Header.ContentLength()
 
