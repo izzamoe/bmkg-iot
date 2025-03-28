@@ -9,16 +9,37 @@ import (
 
 // var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
-// structToMap converts a struct to a map[string]interface{} for flexible data handling
+// StructToMap converts a struct to a map[string]interface{} for flexible data handling
+// Optimized for maximum performance with minimal allocations
 func StructToMap(obj interface{}) map[string]interface{} {
-	// Convert to JSON and back to map for flexibility
+	// Fast path for nil values
+	if obj == nil {
+		return map[string]interface{}{}
+	}
+
+	// Fast path for maps - avoid unnecessary conversion
+	if m, ok := obj.(map[string]interface{}); ok {
+		result := make(map[string]interface{}, len(m))
+		for k, v := range m {
+			result[k] = v
+		}
+		return result
+	}
+
+	// Convert to JSON with the high-performance goccy/go-json library
 	jsonBytes, err := json.Marshal(obj)
 	if err != nil {
 		log.Printf("Error marshaling struct to JSON: %v", err)
 		return map[string]interface{}{}
 	}
 
-	var result map[string]interface{}
+	// Estimate capacity based on JSON size to reduce allocations
+	estimatedFields := len(jsonBytes) / 15
+	if estimatedFields < 8 {
+		estimatedFields = 8 // Reasonable minimum capacity
+	}
+
+	result := make(map[string]interface{}, estimatedFields)
 	if err := json.Unmarshal(jsonBytes, &result); err != nil {
 		log.Printf("Error unmarshaling JSON to map: %v", err)
 		return map[string]interface{}{}
@@ -165,25 +186,41 @@ func OmitFields(data map[string]interface{}, keys []string) map[string]interface
 }
 
 // FlattenMap converts a nested map to a flat map with dot notation keys
+// Optimized for maximum performance with minimal allocations
 func FlattenMap(data map[string]interface{}, prefix string) map[string]interface{} {
-	result := make(map[string]interface{})
+	// Fast path for empty maps
+	if len(data) == 0 {
+		return make(map[string]interface{})
+	}
 
+	// Estimate capacity to reduce map reallocations (3x is a good heuristic for nested data)
+	initialCapacity := len(data) * 3
+	result := make(map[string]interface{}, initialCapacity)
+
+	// Use helper function to avoid creating new result maps in recursive calls
+	flattenMapHelper(data, prefix, result)
+
+	return result
+}
+
+// Helper function that operates on a shared result map to avoid allocations
+func flattenMapHelper(data map[string]interface{}, prefix string, result map[string]interface{}) {
 	for k, v := range data {
-		key := k
-		if prefix != "" {
+		// Compute the current key once
+		var key string
+		if prefix == "" {
+			key = k
+		} else {
 			key = prefix + "." + k
 		}
 
-		if nestedMap, ok := v.(map[string]interface{}); ok {
-			// Recursively flatten nested maps
-			flatMap := FlattenMap(nestedMap, key)
-			for nestedKey, nestedVal := range flatMap {
-				result[nestedKey] = nestedVal
-			}
+		// Process based on value type
+		if nestedMap, ok := v.(map[string]interface{}); ok && len(nestedMap) > 0 {
+			// Recursively process non-empty nested map
+			flattenMapHelper(nestedMap, key, result)
 		} else {
+			// Add leaf value directly to result
 			result[key] = v
 		}
 	}
-
-	return result
 }
