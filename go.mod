@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	github.com/goccy/go-json v0.10.5
 	github.com/joho/godotenv v1.5.1
-	github.com/pocketbase/pocketbase v0.26.1
+	github.com/pocketbase/pocketbase v0.26.4
 	github.com/valyala/fasthttp v1.59.0
 )
 
@@ -19,10 +19,10 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/ganigeorgiev/fexpr v0.4.1 // indirect
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/klauspost/compress v1.17.11 // indirect
+	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
@@ -42,6 +42,6 @@ require (
 	golang.org/x/text v0.23.0 // indirect
 	modernc.org/libc v1.61.13 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
-	modernc.org/memory v1.8.2 // indirect
-	modernc.org/sqlite v1.36.1 // indirect
+	modernc.org/memory v1.9.1 // indirect
+	modernc.org/sqlite v1.36.2 // indirect
 )
