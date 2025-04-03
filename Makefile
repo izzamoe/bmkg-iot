@@ -48,7 +48,9 @@ fmt:
 deps:
 	$(GOGET) -u ./...
 
-# ini pocketbase jadi ada argument serve
+# Run pocketbase with serve command using go run
 serve:
-	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) ./$(CMD_DIR)
-	./$(BUILD_DIR)/$(BINARY_NAME) serve
+	$(GOCMD) run ./$(CMD_DIR) serve
+
+snapshot:
+	$(GOCMD) run ./$(CMD_DIR) migrate collections
