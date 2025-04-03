@@ -3,8 +3,11 @@ package main
 import (
 	"bmkg/src/repository"
 	"bmkg/src/worker/bmkg"
+	"fmt"
 	"log"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/pocketbase/pocketbase"
@@ -33,55 +36,85 @@ func main() {
 			return e.String(http.StatusOK, "Hello "+name)
 		})
 
-		se.Router.GET("/gempa", func(e *core.RequestEvent) error {
+		se.Router.GET("/stats", func(e *core.RequestEvent) error {
 			// Get today's date
 			now := time.Now()
 			todayDateStr := now.Format("2006-01-02")
 
+			// Define combined response struct
+			type StatsResponse struct {
+				GempaCount int    `json:"gempa_count"`
+				IotCount   int    `json:"iot_count"`
+				Date       string `json:"date"`
+			}
+
 			// Struktur untuk menerima hasil COUNT
 			type CountResult struct {
 				Count int `db:"count"`
 			}
 
-			var result CountResult
-
-			// Query optimasi: langsung gunakan date() function di SQLite
-			query := "SELECT COUNT(*) as count FROM view_gempa WHERE date(created) = date('now')"
-
-			err := app.DB().NewQuery(query).One(&result)
-
-			if err != nil {
-				return e.String(http.StatusInternalServerError, "Error querying gempa data: "+err.Error())
+			// Initialize response
+			response := StatsResponse{
+				Date: todayDateStr,
 			}
 
-			return e.JSON(http.StatusOK, map[string]interface{}{
-				"count": result.Count,
-				"date":  todayDateStr,
-			})
+			// Use a mutex to protect concurrent writes
+			var mu sync.Mutex
+			var errors []string
 
-		})
+			// Use a WaitGroup to wait for both goroutines
+			var wg sync.WaitGroup
+			wg.Add(2)
 
-		// Endpoint untuk menghitung total data IOT
-		se.Router.GET("/iot", func(e *core.RequestEvent) error {
-			// Struktur untuk menerima hasil COUNT
-			type CountResult struct {
-				Count int `db:"count"`
+			// Goroutine for gempa query
+			go func() {
+				defer wg.Done()
+
+				var gempaResult CountResult
+				gempaQuery := "SELECT COUNT(*) as count FROM view_gempa WHERE date(created) = date('now')"
+
+				err := app.DB().NewQuery(gempaQuery).One(&gempaResult)
+				if err != nil {
+					mu.Lock()
+					errors = append(errors, fmt.Sprintf("Error querying gempa data: %s", err.Error()))
+					mu.Unlock()
+					return
+				}
+
+				mu.Lock()
+				response.GempaCount = gempaResult.Count
+				mu.Unlock()
+			}()
+
+			// Goroutine for IOT query
+			go func() {
+				defer wg.Done()
+
+				var iotResult CountResult
+				iotQuery := "SELECT COUNT(*) as count FROM iot"
+
+				err := app.DB().NewQuery(iotQuery).One(&iotResult)
+				if err != nil {
+					mu.Lock()
+					errors = append(errors, fmt.Sprintf("Error querying IOT data: %s", err.Error()))
+					mu.Unlock()
+					return
+				}
+
+				mu.Lock()
+				response.IotCount = iotResult.Count
+				mu.Unlock()
+			}()
+
+			// Wait for both queries to complete
+			wg.Wait()
+
+			// Check for errors
+			if len(errors) > 0 {
+				return e.String(http.StatusInternalServerError, strings.Join(errors, "; "))
 			}
 
-			var result CountResult
-
-			// Query untuk menghitung seluruh data di tabel iot
-			query := "SELECT COUNT(*) as count FROM iot"
-
-			err := app.DB().NewQuery(query).One(&result)
-
-			if err != nil {
-				return e.String(http.StatusInternalServerError, "Error querying IOT data: "+err.Error())
-			}
-
-			return e.JSON(http.StatusOK, map[string]interface{}{
-				"total_count": result.Count,
-			})
+			return e.JSON(http.StatusOK, response)
 		})
 
 		// list device broken
