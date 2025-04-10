@@ -5,6 +5,7 @@ import (
 	"bmkg/src/worker/bmkg"
 	"fmt"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
+	"github.com/pocketbase/pocketbase/tools/router"
 	"log"
 	"net/http"
 	"os"
@@ -42,11 +43,7 @@ func main() {
 	})
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
-		se.Router.GET("/hello/{name}", func(e *core.RequestEvent) error {
-			name := e.Request.PathValue("name")
-
-			return e.String(http.StatusOK, "Hello "+name)
-		})
+		funcName(se)
 
 		se.Router.GET("/stats", func(e *core.RequestEvent) error {
 			// Get today's date
@@ -138,4 +135,12 @@ func main() {
 	if err := app.Start(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func funcName(se *core.ServeEvent) *router.Route[*core.RequestEvent] {
+	return se.Router.GET("/hello/{name}", func(e *core.RequestEvent) error {
+		name := e.Request.PathValue("name")
+
+		return e.String(http.StatusOK, "Hello "+name)
+	})
 }
