@@ -17,13 +17,13 @@ type Bot struct {
 }
 
 // NewBot creates a new Bot instance
-func NewBot(app core.App, token string) (*Bot, error) {
+func NewBot(app core.App) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, err
 	}
 
-	api.Debug = true
+	api.Debug = false
 	log.Printf("Authorized on account %s", api.Self.UserName)
 
 	return &Bot{
@@ -156,9 +156,19 @@ func (b *Bot) registerUserLocation(chatID int64, latitude, longitude float64) er
 	return nil
 }
 
+// SendMessage sends a message to a specific chat ID
+func (b *Bot) SendMessage(chatID int64, message string) error {
+	msg := tgbotapi.NewMessage(chatID, message)
+	_, err := b.api.Send(msg)
+	if err != nil {
+		return fmt.Errorf("failed to send message to %d: %v", chatID, err)
+	}
+	return nil
+}
+
 // Run initializes and starts the bot
 func Run(app core.App) {
-	bot, err := NewBot(app, token)
+	bot, err := NewBot(app)
 	if err != nil {
 		log.Panic(err)
 	}

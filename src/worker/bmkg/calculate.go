@@ -7,13 +7,14 @@ import (
 	"bmkg/src/utils/ngitung"
 	"bmkg/src/utils/notify"
 	"bmkg/src/worker/mqtt"
+	"bmkg/src/worker/telegram"
 	"fmt"
 	"github.com/pocketbase/pocketbase/core"
 	"strconv"
 )
 
 // CalculateAndNotify processes earthquake data and sends notifications to affected users and devices
-func CalculateAndNotify(app core.App, mqtt mqtt.MQTTClient, response domain.ResponseBmkgAPI) error {
+func CalculateAndNotify(app core.App, mqtt mqtt.MQTTClient, response domain.ResponseBmkgAPI, telegrambot *telegram.Bot) error {
 	// Extract earthquake data
 	magnitude, err := strconv.ParseFloat(response.Infogempa.Gempa.Magnitude, 64)
 	if err != nil {
@@ -44,7 +45,7 @@ func CalculateAndNotify(app core.App, mqtt mqtt.MQTTClient, response domain.Resp
 	}
 
 	// Notify users in affected areas
-	if err := notifyAffectedUsers(app, earthquakeLocation, magnitude, notificationMsg); err != nil {
+	if err := notifyAffectedUsers(app, earthquakeLocation, magnitude, notificationMsg, telegrambot); err != nil {
 		return fmt.Errorf("error notifying users: %w", err)
 	}
 
@@ -97,7 +98,8 @@ func notifyAffectedDevices(app core.App, mqtt mqtt.MQTTClient, earthquakeLocatio
 }
 
 // NotifyAffectedUsers sends notifications to users who would feel the earthquake
-func notifyAffectedUsers(app core.App, earthquakeLocation ngitung.Location, magnitude float64, message string) error {
+// NotifyAffectedUsers sends notifications to users who would feel the earthquake
+func notifyAffectedUsers(app core.App, earthquakeLocation ngitung.Location, magnitude float64, message string, telegrambot *telegram.Bot) error {
 	// Get all users with notification preferences
 	usersToNotify, err := app.FindAllRecords("user_notify")
 	if err != nil {
@@ -132,7 +134,7 @@ func notifyAffectedUsers(app core.App, earthquakeLocation ngitung.Location, magn
 		}
 
 		// Send notification based on user preference
-		if err := sendNotificationByType(userInfo, message); err != nil {
+		if err := sendNotificationByType(userInfo, message, *telegrambot); err != nil {
 			return fmt.Errorf("failed to send notification to user: %w", err)
 		}
 	}
@@ -151,12 +153,17 @@ func buildEarthquakeNotificationMessage(response domain.ResponseBmkgAPI) string 
 }
 
 // SendNotificationByType sends a notification using the user's preferred notification method
-func sendNotificationByType(userInfo db.UserNotify, message string) error {
+// SendNotificationByType sends a notification using the user's preferred notification method
+func sendNotificationByType(userInfo db.UserNotify, message string, telegrambot telegram.Bot) error {
 	identifier := userInfo.Identifier()
 
 	switch userInfo.Type() {
 	case db.Telegram:
-		return notify.SendTelegramNotification(identifier, message)
+		chatID, err := strconv.ParseInt(identifier, 10, 64)
+		if err != nil {
+			return fmt.Errorf("failed to parse telegram chat ID: %w", err)
+		}
+		return telegrambot.SendMessage(chatID, message)
 	case db.Wa:
 		return notify.SendWhatsAppNotification(identifier, message)
 	default:

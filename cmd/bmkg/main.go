@@ -37,11 +37,18 @@ func main() {
 	// Initialize MQTT client
 	mqttClient := mqtt.NewMQTTClient(mqttconfig)
 	mqttClient.Connect()
+	bot, err := telegram.NewBot(app)
+
 	// new repo
 	bmkgRepo := repository.NewBMKGRepository(app)
 	iotRepo := repository.NewIotRepository(app)
-	bmkgWorker := bmkg.NewBMKGWorker(bmkgRepo, app, mqttClient)
-	telegram.Run(app)
+
+	bmkgWorker := bmkg.NewBMKGWorker(bmkgRepo, app, mqttClient, bot)
+	if err != nil {
+		return
+	}
+
+	go bot.Start()
 
 	// handler
 	iotHandler := handler.NewIotHandler(mqttClient, iotRepo, app)
@@ -50,7 +57,7 @@ func main() {
 	//
 
 	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
-		mqttClient.IsConnected()
+		mqttClient.Disconnect()
 		return nil
 	})
 

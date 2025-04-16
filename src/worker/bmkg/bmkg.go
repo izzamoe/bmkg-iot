@@ -5,6 +5,7 @@ import (
 	"bmkg/src/repository"
 	"bmkg/src/utils"
 	"bmkg/src/worker/mqtt"
+	"bmkg/src/worker/telegram"
 	"context"
 	"encoding/json"
 	"github.com/pocketbase/pocketbase/core"
@@ -14,22 +15,24 @@ import (
 
 // BMKGWorker handles earthquake data processing from BMKG
 type BMKGWorker struct {
-	repo       *repository.BMKG
-	cancelFunc context.CancelFunc
-	ctx        context.Context
-	app        core.App
-	mqtt       mqtt.MQTTClient
+	repo        *repository.BMKG
+	cancelFunc  context.CancelFunc
+	ctx         context.Context
+	app         core.App
+	mqtt        mqtt.MQTTClient
+	bottelegram *telegram.Bot
 }
 
 // NewBMKGWorker creates a new instance of BMKGWorker
-func NewBMKGWorker(repo *repository.BMKG, app core.App, mqtt mqtt.MQTTClient) *BMKGWorker {
+func NewBMKGWorker(repo *repository.BMKG, app core.App, mqtt mqtt.MQTTClient, tele *telegram.Bot) *BMKGWorker {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &BMKGWorker{
-		repo:       repo,
-		ctx:        ctx,
-		cancelFunc: cancel,
-		app:        app,
-		mqtt:       mqtt,
+		repo:        repo,
+		ctx:         ctx,
+		cancelFunc:  cancel,
+		app:         app,
+		mqtt:        mqtt,
+		bottelegram: tele,
 	}
 }
 
@@ -93,7 +96,7 @@ func (w *BMKGWorker) processAndSaveEarthquake(response domain.ResponseBmkgAPI) e
 
 	// jalankan go routine untuk menghitung lokasi device
 	go func() {
-		err := CalculateAndNotify(w.app, w.mqtt, response)
+		err := CalculateAndNotify(w.app, w.mqtt, response, w.bottelegram)
 		if err != nil {
 			log.Printf("Error calculating and notifying device location: %v", err)
 			return
