@@ -21,10 +21,10 @@ func NewIotRepository(app core.App) *Iot {
 }
 
 // SaveData saves data to the database
-func (r *Iot) SaveData(data map[string]interface{}) error {
-	collection, err := r.App.FindCollectionByNameOrId("iot")
+func (r *Iot) SaveData(data map[string]interface{}) (string, error) {
+	collection, err := r.App.FindCollectionByNameOrId("iot_device")
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Create a new record
@@ -37,10 +37,10 @@ func (r *Iot) SaveData(data map[string]interface{}) error {
 
 	// Save the record
 	if err := r.App.Save(record); err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return record.Id, nil
 }
 
 // get all data from iot name iot_device to Domain.Iot
@@ -77,7 +77,7 @@ func (r *Iot) GetBrokenDevice() ([]domain.IotDevice, error) {
 			LEFT JOIN history_iot h2 ON h1.device = h2.device AND h1.created < h2.created
 			WHERE h2.created IS NULL
 		) h ON d.id = h.device
-		WHERE h.created < {:threshold} OR h.active = false OR h.created IS NULL
+		WHERE h.created < {:threshold} OR h.active = false
 	`
 
 	err := r.App.DB().

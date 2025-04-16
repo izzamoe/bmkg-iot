@@ -4,8 +4,10 @@ import (
 	"bmkg/src/domain"
 	"bmkg/src/repository"
 	"bmkg/src/utils"
+	"bmkg/src/worker/mqtt"
 	"context"
 	"encoding/json"
+	"github.com/pocketbase/pocketbase/core"
 	"log"
 	"time"
 )
@@ -15,15 +17,19 @@ type BMKGWorker struct {
 	repo       *repository.BMKG
 	cancelFunc context.CancelFunc
 	ctx        context.Context
+	app        core.App
+	mqtt       mqtt.MQTTClient
 }
 
 // NewBMKGWorker creates a new instance of BMKGWorker
-func NewBMKGWorker(repo *repository.BMKG) *BMKGWorker {
+func NewBMKGWorker(repo *repository.BMKG, app core.App, mqtt mqtt.MQTTClient) *BMKGWorker {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &BMKGWorker{
 		repo:       repo,
 		ctx:        ctx,
 		cancelFunc: cancel,
+		app:        app,
+		mqtt:       mqtt,
 	}
 }
 
@@ -84,6 +90,15 @@ func (w *BMKGWorker) processAndSaveEarthquake(response domain.ResponseBmkgAPI) e
 
 	// Add timestamp for when this data was fetched
 	gempaData["fetchedAt"] = time.Now().Format(time.RFC3339)
+
+	// jalankan go routine untuk menghitung lokasi device
+	go func() {
+		err := CalculateAndNotify(w.app, w.mqtt, response)
+		if err != nil {
+			log.Printf("Error calculating and notifying device location: %v", err)
+			return
+		}
+	}()
 
 	// Save to repository
 	return w.repo.SaveGempa(gempaData)
